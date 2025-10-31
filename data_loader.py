@@ -11,7 +11,7 @@ def load_data(*args, **kwargs):
     """
 
     season = 2025
-    past_years = 5
+    past_years = 10
     start_matchweek = 1
     end_matchweek = 38
 
@@ -74,7 +74,7 @@ def load_data(*args, **kwargs):
 
         if season - year == season:
             season_2025_start_date = date(2025, 8, 15)
-            actual_date = date(2025,10,20)
+            actual_date = date.today()
             end_matchweek = round((actual_date - season_2025_start_date).days / 7) - 1
         else:
             end_matchweek = 38
@@ -165,12 +165,11 @@ def load_data(*args, **kwargs):
     standings_df = pd.DataFrame(all_standings)
 
     matches_df = adjust_values(matches_df)
-    print('asnksbfnasbf,nmasdb,mnasdbf')
 
     return matches_df, standings_df
 
 def adjust_values(m):
-    m['clock'] = m['clock'].astype(int)
+    #m['clock'] = m['clock'].astype(int)
     m['away_team_id'] = m['away_team_id'].astype(int)
     m['home_team_id'] = m['home_team_id'].astype(int)
     mean_attendance = m['attendance'].median()
