@@ -1,0 +1,32 @@
+name: github-pages-documentation
+
+on:
+  push:
+    branches: [ "master" ]
+    
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+
+
+jobs:
+  deploy:
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repositiory
+        uses: actions/checkout@v4
+        
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+      
+      - name: Install dependencies using pip3
+        run: pip3 install mkdocs mkdocs-material
+
+      - name: Deploy documentation to GitHub Pages
+        run: |
+          cd doc
+          mkdocs gh-deploy --force
