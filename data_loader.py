@@ -11,7 +11,7 @@ def load_data(*args, **kwargs):
     """
 
     season = 2025
-    past_years = 10
+    past_years = 11
     start_matchweek = 1
     end_matchweek = 38
 
@@ -133,13 +133,13 @@ def load_data(*args, **kwargs):
 
                         if home_score is not None and away_score is not None:
                             if home_score > away_score:
-                                match_info['outcome'] = 'H'  # Home win
+                                match_info['outcome'] = 'H_or_D'  # Home win
                                 match_info['winner'] = match_info['home_team']
                             elif home_score < away_score:
                                 match_info['outcome'] = 'A'  # Away win
                                 match_info['winner'] = match_info['away_team']
                             else:
-                                match_info['outcome'] = 'D'  # Draw
+                                match_info['outcome'] = 'H_or_D'  # Draw
                                 match_info['winner'] = 'Draw'
                             all_matches.append(match_info)
 
@@ -169,11 +169,8 @@ def load_data(*args, **kwargs):
     return matches_df, standings_df
 
 def adjust_values(m):
-    #m['clock'] = m['clock'].astype(int)
     m['away_team_id'] = m['away_team_id'].astype(int)
     m['home_team_id'] = m['home_team_id'].astype(int)
-    mean_attendance = m['attendance'].median()
-    m['attendance'].fillna(mean_attendance, inplace=True)
     print("\n--- Basic Info ---")
     print(m.info())
 
