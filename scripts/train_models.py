@@ -59,7 +59,7 @@ def main():
         print("  Run 'python scripts/download_data.py' first")
         sys.exit(1)
 
-    matches = pd.read_csv(MATCHES_CSV)
+    matches = pd.read_csv(MATCHES_CSV, parse_dates=['kickoff_datetime'])
     print(f"Loaded {len(matches)} matches")
 
     # Prepare features

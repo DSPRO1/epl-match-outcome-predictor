@@ -163,8 +163,11 @@ def prepare_features(df: pd.DataFrame) -> pd.DataFrame:
     # Create rest days features
     df = create_rest_days(df)
 
+    # Convert 3-way outcome to 2-way (H_or_D vs A) for binary classification
+    df['outcome_binary'] = df['outcome_label'].apply(lambda x: 'H_or_D' if x in ['H', 'D'] else x)
+
     # Create target variable
-    df['target'] = df['outcome_label'].map(LABEL_MAP)
+    df['target'] = df['outcome_binary'].map(LABEL_MAP)
 
     return df
 
