@@ -11,6 +11,9 @@ Usage:
     # Run full pipeline
     python pipeline.py
 
+    # Use existing data (skip download)
+    python pipeline.py --skip-download
+
     # Run specific steps
     python pipeline.py --steps download train
 
@@ -80,6 +83,12 @@ def main():
     )
 
     parser.add_argument(
+        '--skip-download',
+        action='store_true',
+        help='Skip data download (use existing data/matches.csv)'
+    )
+
+    parser.add_argument(
         '--deploy',
         action='store_true',
         help='Deploy model to Modal after training'
@@ -104,6 +113,9 @@ def main():
     if args.skip_db and 'database' in steps:
         steps.remove('database')
 
+    if args.skip_download and 'download' in steps:
+        steps.remove('download')
+
     print("=" * 80)
     print("EPL MATCH OUTCOME PREDICTOR - ML PIPELINE")
     print("=" * 80)
@@ -111,6 +123,8 @@ def main():
     print(f"Model: {args.model}")
     if args.no_wandb:
         print("W&B tracking: Disabled")
+    if args.skip_download:
+        print("Data download: Skipped (using existing data)")
     print()
 
     success = True
@@ -156,7 +170,7 @@ def main():
     if 'deploy' not in steps:
         print("  • Deploy model: python scripts/deploy_model.py")
     print("  • Start web UI: cd web-ui && bun run dev")
-    print("  • View W&B dashboard: https://wandb.ai/dspro1/epl-predictor")
+    print("  • View W&B dashboard: https://wandb.ai/philip-baumann-hslu/epl-match-outcome-predictor")
 
 
 if __name__ == "__main__":

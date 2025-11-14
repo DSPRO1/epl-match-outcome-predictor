@@ -94,8 +94,8 @@ INVERSE_LABEL_MAP = {0: 'H_or_D', 1: 'A'}
 DATABASE_URL = os.environ.get('DATABASE_URL')
 
 # Weights & Biases configuration
-WANDB_ENTITY = os.environ.get('WANDB_ENTITY', 'dspro1')
-WANDB_PROJECT = os.environ.get('WANDB_PROJECT', 'epl-predictor')
+WANDB_ENTITY = os.environ.get('WANDB_ENTITY', 'philip-baumann-hslu')
+WANDB_PROJECT = os.environ.get('WANDB_PROJECT', 'epl-match-outcome-predictor')
 
 # API configuration
 MODAL_APP_NAME = "epl-predictor"
