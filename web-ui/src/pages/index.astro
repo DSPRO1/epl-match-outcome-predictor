@@ -1,0 +1,48 @@
+---
+import Layout from '../layouts/Layout.astro';
+import PredictionForm from '../components/PredictionForm';
+---
+
+<Layout title="EPL Match Outcome Predictor">
+  <main class="container mx-auto px-4 py-12">
+    <div class="text-center mb-12">
+      <h1 class="text-5xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent mb-4">
+        EPL Match Predictor
+      </h1>
+      <p class="text-xl text-gray-600 max-w-2xl mx-auto">
+        Predict English Premier League match outcomes using machine learning trained on 11 seasons of data
+      </p>
+      <div class="flex gap-4 justify-center mt-6">
+        <div class="bg-white px-4 py-2 rounded-lg shadow">
+          <p class="text-sm text-gray-600">Accuracy</p>
+          <p class="text-2xl font-bold text-blue-600">80.79%</p>
+        </div>
+        <div class="bg-white px-4 py-2 rounded-lg shadow">
+          <p class="text-sm text-gray-600">Model</p>
+          <p class="text-2xl font-bold text-purple-600">Random Forest</p>
+        </div>
+        <div class="bg-white px-4 py-2 rounded-lg shadow">
+          <p class="text-sm text-gray-600">Features</p>
+          <p class="text-2xl font-bold text-green-600">12</p>
+        </div>
+      </div>
+    </div>
+
+    <PredictionForm client:load />
+
+    <footer class="mt-16 text-center text-gray-600 text-sm">
+      <p class="mb-2">
+        Powered by machine learning trained on EPL data from 2014-2025
+      </p>
+      <p>
+        <a
+          href="https://github.com/DSPRO1/epl-match-outcome-predictor"
+          target="_blank"
+          class="text-blue-600 hover:text-blue-700 underline"
+        >
+          View on GitHub
+        </a>
+      </p>
+    </footer>
+  </main>
+</Layout>
