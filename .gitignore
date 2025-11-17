@@ -1,4 +1,44 @@
-.idea/*
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
 .venv
-/doc/site/
-data/*
+
+# IDE
+.idea/*
+.vscode/
+.claude/
+*.swp
+*.swo
+*~
+
+# Data files
+data/*.csv
+data/*.json
+
+# Trained models
+models/*.pkl
+*.pkl
+
+# Weights & Biases
+wandb/
+
+# Environment variables
+.env
+web-ui/.env
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Temporary files
+*.tmp
+*.bak
