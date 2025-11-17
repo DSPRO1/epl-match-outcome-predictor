@@ -15,7 +15,7 @@ mkdocs-get-deps==0.2.0
 packaging==25.0
 pathspec==0.12.1
 platformdirs==4.5.0
-protobuf==6.32.1
+protobuf>=3.19.0,<6.0
 pydantic==2.12.0
 pydantic_core==2.41.1
 python-dateutil==2.9.0.post0
@@ -42,3 +42,8 @@ numpy==1.26.4
 # Visualization
 matplotlib==3.9.2
 seaborn==0.13.2
+
+# API & Deployment
+modal==0.69.1
+fastapi[standard]==0.115.0
+psycopg2-binary==2.9.10
