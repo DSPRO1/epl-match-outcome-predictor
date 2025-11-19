@@ -102,6 +102,18 @@ class TeamStats(BaseModel):
     matches_played: int
 
 
+class Fixture(BaseModel):
+    """Upcoming fixture information."""
+
+    match_id: int
+    home_team: str
+    away_team: str
+    kickoff: str
+    matchweek: int
+    season: int
+    venue: Optional[str] = None
+
+
 def get_db_connection():
     """Create database connection."""
     import psycopg2
@@ -146,6 +158,107 @@ def get_team_stats(team_name: str) -> dict:
         }
     finally:
         conn.close()
+
+
+# Simple in-memory cache for fixtures (reset on deployment)
+_fixtures_cache = {"data": None, "timestamp": None}
+CACHE_DURATION_SECONDS = 300  # 5 minutes
+
+
+def get_next_fixture() -> Optional[dict]:
+    """
+    Fetch the next upcoming EPL fixture from the Premier League API.
+    Results are cached for 5 minutes to reduce API calls.
+    """
+    from datetime import datetime, timezone
+
+    import requests
+
+    # Check cache
+    now = datetime.now(timezone.utc)
+    if _fixtures_cache["data"] and _fixtures_cache["timestamp"]:
+        cache_age = (now - _fixtures_cache["timestamp"]).total_seconds()
+        if cache_age < CACHE_DURATION_SECONDS:
+            return _fixtures_cache["data"]
+
+    # Fetch from API
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+    }
+
+    # Try current year and next year (EPL seasons span two years)
+    current_year = datetime.now().year
+    seasons_to_try = [current_year, current_year + 1, current_year - 1]
+
+    all_upcoming = []
+
+    for season in seasons_to_try:
+        # Try all matchweeks for this season
+        for matchweek in range(1, 39):
+            try:
+                url = f"https://sdp-prem-prod.premier-league-prod.pulselive.com/api/v1/competitions/8/seasons/{season}/matchweeks/{matchweek}/matches"
+                response = requests.get(url, headers=headers, timeout=10)
+
+                if response.status_code != 200:
+                    continue
+
+                data = response.json()
+                matches = data.get("data", [])
+
+                # Find upcoming matches (no score yet)
+                for match in matches:
+                    home_team = match.get("homeTeam", {})
+                    away_team = match.get("awayTeam", {})
+                    kickoff = match.get("kickoff")
+
+                    # Match hasn't been played if scores are None
+                    if home_team.get("score") is None and away_team.get("score") is None:
+                        if kickoff:
+                            try:
+                                # Parse kickoff time and ensure it's timezone-aware (assume UTC)
+                                if kickoff.endswith("Z"):
+                                    kickoff_dt = datetime.fromisoformat(kickoff.replace("Z", "+00:00"))
+                                else:
+                                    # No timezone info, assume UTC
+                                    kickoff_dt = datetime.fromisoformat(kickoff).replace(tzinfo=timezone.utc)
+
+                                # Only include future matches
+                                if kickoff_dt > now:
+                                    all_upcoming.append(
+                                        {
+                                            "match_id": match.get("matchId"),
+                                            "home_team": home_team.get("name"),
+                                            "away_team": away_team.get("name"),
+                                            "kickoff": kickoff,
+                                            "kickoff_dt": kickoff_dt,
+                                            "matchweek": matchweek,
+                                            "season": season,
+                                            "venue": match.get("ground"),
+                                        }
+                                    )
+                            except Exception:
+                                continue
+
+            except Exception:
+                continue
+
+        # If we found upcoming matches in this season, no need to check others
+        if all_upcoming:
+            break
+
+    # Find the soonest match across all seasons
+    if all_upcoming:
+        next_match = min(all_upcoming, key=lambda x: x["kickoff_dt"])
+        # Remove the datetime object before returning
+        next_match.pop("kickoff_dt")
+
+        # Cache the result
+        _fixtures_cache["data"] = next_match
+        _fixtures_cache["timestamp"] = now
+
+        return next_match
+
+    return None
 
 
 @app.function(
@@ -241,10 +354,11 @@ async def root():
     return {
         "service": "EPL Match Outcome Predictor",
         "status": "healthy",
-        "version": "2.0.0",
+        "version": "2.1.0",
         "endpoints": {
             "predict": "/predict (POST, requires API key)",
             "teams": "/teams (GET, public)",
+            "fixtures": "/fixtures/next (GET, public)",
             "health": "/health (GET, public)",
             "docs": "/docs (GET, public)",
         },
@@ -436,6 +550,27 @@ async def list_teams():
         }
     finally:
         conn.close()
+
+
+@web_app.get("/fixtures/next", response_model=Fixture)
+async def get_next_match():
+    """
+    Get the next upcoming EPL fixture.
+
+    Returns the soonest upcoming match with kickoff time.
+    Results are cached for 5 minutes.
+
+    No authentication required - public endpoint.
+    """
+    fixture = get_next_fixture()
+
+    if not fixture:
+        raise HTTPException(
+            status_code=404,
+            detail="No upcoming fixtures found. Check back during the EPL season.",
+        )
+
+    return fixture
 
 
 @app.function(
