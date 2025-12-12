@@ -92,54 +92,7 @@ def load_data():
         print(f"\nSample data:")
         print(matches_df[['home_team', 'away_team', 'home_score', 'away_score', 'outcome']].head(5))
 
-    matches_df = adjust_values(matches_df)
+    matches_df['away_team_id'] = matches_df['away_team_id'].astype(int)
+    matches_df['home_team_id'] = matches_df['home_team_id'].astype(int)
 
     return matches_df
-
-def adjust_values(m):
-    m['away_team_id'] = m['away_team_id'].astype(int)
-    m['home_team_id'] = m['home_team_id'].astype(int)
-    print("\n--- Basic Info ---")
-    print(m.info())
-
-    print("\n--- Sample Data ---")
-    print(m.head())
-
-    print("\n--- Missing Values ---")
-    print(m.isna().sum())
-
-    print("\n--- Duplicate Rows ---")
-    print(m.duplicated().sum())
-
-    print("\n--- Data Type Summary ---")
-    print(m.dtypes)
-
-    print("\n--- Numeric Range Checks ---")
-    print("Goals negative:", ((m['away_score'] < 0) | (m['home_score'] < 0)).sum())
-
-    print("\n--- Logical Checks ---")
-    def winner_correct(row):
-        if row['outcome'] == 'H' and row['winner'] != row['home_team']:
-            return False
-        elif row['outcome'] == 'A' and row['winner'] != row['away_team']:
-            return False
-        elif row['outcome'] == 'D' and row['winner'] != 'Draw':
-            return False
-        return True
-
-    logic_issues = m.apply(lambda r: not winner_correct(r), axis=1).sum()
-    print(f"Rows with mismatched Winner/Outcome: {logic_issues}")
-    print("Missing matches:", 10 - len(m) % 10)
-
-    summary = {
-        "rows": len(m),
-        "columns": len(m.columns),
-        "missing_values": m.isna().sum().sum(),
-        "duplicates": m.duplicated().sum(),
-        "logical_issues": logic_issues,
-    }
-    print("\n--- Summary ---")
-    for k, v in summary.items():
-        print(f"{k}: {v}")
-
-    return m

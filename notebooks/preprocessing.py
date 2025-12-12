@@ -82,11 +82,15 @@ def create_features(df, label_map):
 
     df = df.sort_values('kickoff_datetime').reset_index(drop=True)
 
+
+
     last_kickoff = {}
     rest_days_home = []
     rest_days_away = []
     for _, row in df.iterrows():
-        th = row['home_team']; ta = row['away_team']; t0 = row['kickoff_datetime']
+        th = row['home_team']
+        ta = row['away_team']
+        t0 = row['kickoff_datetime']
 
         if th in last_kickoff:
             delta = (t0 - last_kickoff[th]).total_seconds() / (24*3600)
