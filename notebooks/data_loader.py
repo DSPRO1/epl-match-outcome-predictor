@@ -5,7 +5,6 @@ from datetime import date
 def load_data():
     """
     Load EPL match outcomes from Premier League API.
-
     """
 
     season = 2025
