@@ -93,5 +93,6 @@ def load_data():
 
     matches_df['away_team_id'] = matches_df['away_team_id'].astype(int)
     matches_df['home_team_id'] = matches_df['home_team_id'].astype(int)
+    matches_df['match_id'] = matches_df['match_id'].astype(int)
 
     return matches_df
