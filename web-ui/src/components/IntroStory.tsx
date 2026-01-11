@@ -83,28 +83,76 @@ export default function IntroStory({ onComplete }: { onComplete: () => void }) {
             We engineered <span className="text-[var(--accent-cyan)]">14 predictive features</span> from raw match data,
             capturing team strength, form, and historical matchups.
           </p>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-6">
-            {[
-              { name: 'ELO Rating', desc: 'Dynamic team strength', color: 'cyan' },
-              { name: 'ELO Diff', desc: 'Relative advantage', color: 'cyan' },
-              { name: 'Goals For', desc: '5-match rolling avg', color: 'green' },
-              { name: 'Goals Against', desc: '5-match rolling avg', color: 'green' },
-              { name: 'Points Avg', desc: 'Recent form', color: 'green' },
-              { name: 'Rest Days', desc: 'Recovery time', color: 'purple' },
-              { name: 'H2H Home', desc: 'Head-to-head history', color: 'orange' },
-              { name: 'H2H Away', desc: 'Head-to-head history', color: 'orange' },
-            ].map((feature) => (
-              <div
-                key={feature.name}
-                className="p-3 bg-[var(--bg-elevated)] rounded-lg border border-[var(--border-subtle)]"
-              >
-                <p className={`font-mono text-xs text-[var(--accent-${feature.color})]`}>{feature.name}</p>
-                <p className="text-xs text-[var(--text-muted)] mt-1">{feature.desc}</p>
+          <div className="grid grid-cols-2 gap-4 mt-6">
+            <div className="p-4 bg-[var(--bg-elevated)] rounded-xl border border-[var(--border-subtle)]">
+              <p className="text-xs text-[var(--text-muted)] uppercase tracking-wide mb-2">Team Strength (6 features)</p>
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-[var(--text-secondary)]">ELO Rating (Home)</span>
+                  <span className="font-mono text-[var(--accent-cyan)]">✓</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-[var(--text-secondary)]">ELO Rating (Away)</span>
+                  <span className="font-mono text-[var(--accent-cyan)]">✓</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-[var(--text-secondary)]">ELO Difference</span>
+                  <span className="font-mono text-[var(--accent-cyan)]">✓</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-[var(--text-secondary)]">Rest Days (Home)</span>
+                  <span className="font-mono text-[var(--accent-purple)]">✓</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-[var(--text-secondary)]">Rest Days (Away)</span>
+                  <span className="font-mono text-[var(--accent-purple)]">✓</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-[var(--text-secondary)]">Rest Days Difference</span>
+                  <span className="font-mono text-[var(--accent-purple)]">✓</span>
+                </div>
               </div>
-            ))}
+            </div>
+            <div className="p-4 bg-[var(--bg-elevated)] rounded-xl border border-[var(--border-subtle)]">
+              <p className="text-xs text-[var(--text-muted)] uppercase tracking-wide mb-2">Performance & History (8 features)</p>
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-[var(--text-secondary)]">Goals For (Home, 5-match)</span>
+                  <span className="font-mono text-[var(--accent-green)]">✓</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-[var(--text-secondary)]">Goals Against (Home, 5-match)</span>
+                  <span className="font-mono text-[var(--accent-green)]">✓</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-[var(--text-secondary)]">Points Avg (Home, 5-match)</span>
+                  <span className="font-mono text-[var(--accent-green)]">✓</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-[var(--text-secondary)]">Goals For (Away, 5-match)</span>
+                  <span className="font-mono text-[var(--accent-green)]">✓</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-[var(--text-secondary)]">Goals Against (Away, 5-match)</span>
+                  <span className="font-mono text-[var(--accent-green)]">✓</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-[var(--text-secondary)]">Points Avg (Away, 5-match)</span>
+                  <span className="font-mono text-[var(--accent-green)]">✓</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-[var(--text-secondary)]">Head-to-Head (Home)</span>
+                  <span className="font-mono text-[var(--accent-orange)]">✓</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-[var(--text-secondary)]">Head-to-Head (Away)</span>
+                  <span className="font-mono text-[var(--accent-orange)]">✓</span>
+                </div>
+              </div>
+            </div>
           </div>
           <p className="text-sm text-[var(--text-muted)]">
-            Features are calculated for both home and away teams, updated after every match.
+            Features are calculated for both home and away teams, updated chronologically after every match using time-series cross-validation.
           </p>
         </div>
       ),
