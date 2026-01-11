@@ -13,12 +13,19 @@ const { title } = Astro.props;
   <head>
     <meta charset="UTF-8" />
     <meta name="description" content="Predict English Premier League match outcomes using machine learning" />
-    <meta name="viewport" content="width=device-width" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="generator" content={Astro.generator} />
+    <meta name="theme-color" content="#05050a" />
     <title>{title}</title>
   </head>
-  <body class="bg-gradient-to-br from-purple-50 to-blue-50 min-h-screen">
-    <slot />
+  <body>
+    <!-- Secondary gradient orb -->
+    <div class="bg-orb-secondary"></div>
+
+    <!-- Main content -->
+    <div class="relative z-10">
+      <slot />
+    </div>
   </body>
 </html>

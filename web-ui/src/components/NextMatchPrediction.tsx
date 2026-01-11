@@ -30,7 +30,149 @@ interface CachedData {
 }
 
 const CACHE_KEY = 'epl_next_match_prediction';
-const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes in milliseconds
+const CACHE_DURATION = 5 * 60 * 1000;
+
+// Radial progress chart component
+function RadialChart({
+  percent,
+  color,
+  size = 100,
+  strokeWidth = 6,
+  label
+}: {
+  percent: number;
+  color: string;
+  size?: number;
+  strokeWidth?: number;
+  label: string;
+}) {
+  const radius = (size - strokeWidth) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const offset = circumference - (percent / 100) * circumference;
+
+  return (
+    <div className="flex flex-col items-center">
+      <div className="relative" style={{ width: size, height: size }}>
+        <svg className="transform -rotate-90" width={size} height={size}>
+          {/* Background circle */}
+          <circle
+            cx={size / 2}
+            cy={size / 2}
+            r={radius}
+            fill="none"
+            stroke="var(--bg-deep)"
+            strokeWidth={strokeWidth}
+          />
+          {/* Progress circle */}
+          <circle
+            cx={size / 2}
+            cy={size / 2}
+            r={radius}
+            fill="none"
+            stroke={color}
+            strokeWidth={strokeWidth}
+            strokeLinecap="round"
+            strokeDasharray={circumference}
+            strokeDashoffset={offset}
+            style={{
+              transition: 'stroke-dashoffset 1s cubic-bezier(0.16, 1, 0.3, 1)',
+              filter: `drop-shadow(0 0 8px ${color})`
+            }}
+          />
+        </svg>
+        <div className="absolute inset-0 flex items-center justify-center">
+          <span
+            className="font-mono text-lg font-bold"
+            style={{ color }}
+          >
+            {percent.toFixed(1)}%
+          </span>
+        </div>
+      </div>
+      <span className="mt-2 text-xs text-[var(--text-muted)] uppercase tracking-wider">
+        {label}
+      </span>
+    </div>
+  );
+}
+
+// Model comparison bar
+function ModelBar({
+  model,
+  homeDrawProb,
+  awayProb,
+  isActive
+}: {
+  model: string;
+  homeDrawProb: number;
+  awayProb: number;
+  isActive: boolean;
+}) {
+  const modelLabels: Record<string, string> = {
+    'random_forest': 'RF',
+    'xgboost': 'XGB',
+    'lightgbm': 'LGBM'
+  };
+
+  return (
+    <div className={`
+      p-4 rounded-xl border transition-all duration-300
+      ${isActive
+        ? 'bg-[var(--bg-elevated)] border-[var(--accent-cyan)]/30'
+        : 'bg-[var(--bg-surface)] border-[var(--border-subtle)]'
+      }
+    `}>
+      {/* Model label */}
+      <div className="flex items-center justify-between mb-3">
+        <span className="font-mono text-xs text-[var(--text-secondary)] uppercase tracking-wider">
+          {modelLabels[model] || model}
+        </span>
+        {isActive && (
+          <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent-cyan)] animate-pulse" />
+        )}
+      </div>
+
+      {/* Dual bar chart */}
+      <div className="space-y-2">
+        {/* Home/Draw bar */}
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] font-mono text-[var(--text-muted)] w-6">H/D</span>
+          <div className="flex-1 h-2 bg-[var(--bg-deep)] rounded-full overflow-hidden">
+            <div
+              className="h-full rounded-full transition-all duration-1000 ease-out"
+              style={{
+                width: `${homeDrawProb * 100}%`,
+                background: 'linear-gradient(90deg, var(--accent-cyan-dim), var(--accent-cyan))',
+                boxShadow: '0 0 10px var(--accent-cyan)'
+              }}
+            />
+          </div>
+          <span className="text-xs font-mono text-[var(--accent-cyan)] w-12 text-right">
+            {(homeDrawProb * 100).toFixed(1)}%
+          </span>
+        </div>
+
+        {/* Away bar */}
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] font-mono text-[var(--text-muted)] w-6">A</span>
+          <div className="flex-1 h-2 bg-[var(--bg-deep)] rounded-full overflow-hidden">
+            <div
+              className="h-full rounded-full transition-all duration-1000 ease-out"
+              style={{
+                width: `${awayProb * 100}%`,
+                background: 'linear-gradient(90deg, var(--accent-magenta-dim), var(--accent-magenta))',
+                boxShadow: '0 0 10px var(--accent-magenta)'
+              }}
+            />
+          </div>
+          <span className="text-xs font-mono text-[var(--accent-magenta)] w-12 text-right">
+            {(awayProb * 100).toFixed(1)}%
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function NextMatchPrediction() {
   const [loading, setLoading] = useState(true);
@@ -44,7 +186,6 @@ export default function NextMatchPrediction() {
 
   const loadNextMatchPrediction = async () => {
     try {
-      // Check cache first
       const cached = checkCache();
       if (cached) {
         setFixture(cached.fixture);
@@ -53,14 +194,11 @@ export default function NextMatchPrediction() {
         return;
       }
 
-      // Fetch next fixture
       const apiUrl = import.meta.env.PUBLIC_API_URL || 'https://dspro1--epl-predictor-fastapi-app.modal.run';
 
       const fixtureResponse = await fetch(`${apiUrl}/fixtures/next`);
       if (!fixtureResponse.ok) {
         if (fixtureResponse.status === 404) {
-          // Silently fail - no upcoming fixtures available
-          // Component will not render anything
           setLoading(false);
           return;
         }
@@ -70,7 +208,6 @@ export default function NextMatchPrediction() {
       const fixtureData: Fixture = await fixtureResponse.json();
       setFixture(fixtureData);
 
-      // Make predictions from all three models
       const apiKey = import.meta.env.PUBLIC_API_KEY;
       if (!apiKey) {
         throw new Error('API key not configured');
@@ -100,8 +237,6 @@ export default function NextMatchPrediction() {
       }
 
       setPredictions(predictionsData);
-
-      // Cache the results
       cacheResults(fixtureData, predictionsData);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load prediction');
@@ -119,12 +254,10 @@ export default function NextMatchPrediction() {
       const data: CachedData = JSON.parse(cached);
       const now = Date.now();
 
-      // Check if cache is still valid
       if (now - data.timestamp < CACHE_DURATION) {
         return data;
       }
 
-      // Cache expired, remove it
       sessionStorage.removeItem(CACHE_KEY);
       return null;
     } catch {
@@ -145,8 +278,6 @@ export default function NextMatchPrediction() {
     }
   };
 
-
-
   const formatKickoffTime = (kickoff: string) => {
     try {
       const date = new Date(kickoff);
@@ -165,98 +296,137 @@ export default function NextMatchPrediction() {
 
   if (loading) {
     return (
-      <div className="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-2xl shadow-xl p-8 mb-8">
-        <div className="flex items-center justify-center space-x-3">
-          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-indigo-600"></div>
-          <p className="text-gray-600">Loading next match prediction...</p>
+      <div className="card-dark card-glow p-8">
+        <div className="flex items-center justify-center gap-3">
+          <div className="spinner spinner-glow" />
+          <span className="text-[var(--text-secondary)] font-mono text-sm">
+            Loading predictions<span className="cursor-blink"></span>
+          </span>
         </div>
       </div>
     );
   }
 
   if (error || !fixture || Object.keys(predictions).length === 0) {
-    return null; // Don't show anything if there's an error or no data
+    return null;
   }
 
+  const modelOrder = ['random_forest', 'xgboost', 'lightgbm'];
+  // Use first available prediction for main display
+  const mainPrediction = predictions['random_forest'] || predictions['xgboost'] || predictions['lightgbm'];
+
   return (
-    <div className="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-2xl shadow-xl p-8 mb-8 border-2 border-indigo-200">
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center space-x-2">
-          <div className="bg-indigo-600 text-white px-3 py-1 rounded-full text-sm font-semibold">
-            NEXT MATCH
-          </div>
-          <div className="text-sm text-gray-600">
-            Auto-predicted
-          </div>
-        </div>
-        <div className="text-sm text-gray-600">
-          MW {fixture.matchweek}
-        </div>
-      </div>
+    <div className="card-dark card-glow-cyan overflow-hidden">
+      {/* Top gradient bar */}
+      <div className="h-1 bg-gradient-to-r from-[var(--accent-cyan)] via-[var(--accent-purple)] to-[var(--accent-magenta)]" />
 
-      <div className="text-center mb-6">
-        <h3 className="text-3xl font-bold text-gray-900 mb-2">
-          {fixture.home_team} vs {fixture.away_team}
-        </h3>
-        <p className="text-sm text-gray-600 mb-1">
-          {formatKickoffTime(fixture.kickoff)}
-        </p>
-        {fixture.venue && (
-          <p className="text-xs text-gray-500">{fixture.venue}</p>
-        )}
-      </div>
-
-      {Object.entries(predictions).map(([model, pred]) => (
-        <div key={model} className="bg-white rounded-xl p-6 mb-4">
-          <div className="flex items-center justify-between mb-4">
-            <div className="text-center flex-1">
-              <p className="text-2xl font-bold text-indigo-600 mb-2">
-                {pred.prediction}
-              </p>
-              <p className="text-lg text-gray-600">
-                Confidence: <span className="font-bold text-purple-600">
-                  {(pred.confidence * 100).toFixed(1)}%
-                </span>
-              </p>
+      <div className="p-6 md:p-8">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 px-3 py-1.5 bg-[var(--accent-cyan)]/10 border border-[var(--accent-cyan)]/30 rounded-full">
+              <span className="w-2 h-2 rounded-full bg-[var(--accent-cyan)] animate-pulse" />
+              <span className="font-mono text-xs text-[var(--accent-cyan)] uppercase tracking-wider">
+                Next Match
+              </span>
             </div>
-            <span className="px-3 py-1 bg-indigo-100 text-indigo-800 rounded-full text-sm font-medium">
-              {pred.model_used.replace('_', ' ').toUpperCase()}
+          </div>
+          <div className="text-right">
+            <span className="font-mono text-xs text-[var(--text-muted)]">
+              MW {fixture.matchweek}
             </span>
           </div>
+        </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div className="bg-gradient-to-br from-green-50 to-green-100 p-4 rounded-lg">
-              <p className="text-xs text-gray-600 mb-1">Home/Draw</p>
-              <p className="text-2xl font-bold text-green-700">
-                {(pred.probabilities.home_or_draw * 100).toFixed(1)}%
+        {/* Match Title */}
+        <div className="text-center mb-8">
+          <div className="flex items-center justify-center gap-4 md:gap-8 mb-4">
+            <h3 className="text-xl md:text-3xl font-bold text-[var(--text-primary)] flex-1 text-right">
+              {fixture.home_team}
+            </h3>
+            <div className="flex-shrink-0 w-12 h-12 rounded-full border-2 border-[var(--border-subtle)] bg-[var(--bg-elevated)] flex items-center justify-center">
+              <span className="font-mono text-xs text-[var(--text-muted)]">VS</span>
+            </div>
+            <h3 className="text-xl md:text-3xl font-bold text-[var(--text-primary)] flex-1 text-left">
+              {fixture.away_team}
+            </h3>
+          </div>
+          <p className="font-mono text-sm text-[var(--text-secondary)]">
+            {formatKickoffTime(fixture.kickoff)}
+          </p>
+          {fixture.venue && (
+            <p className="text-xs text-[var(--text-muted)] mt-1">{fixture.venue}</p>
+          )}
+        </div>
+
+        {/* Main Prediction Display */}
+        {mainPrediction && (
+          <div className="mb-8">
+            {/* Outcome */}
+            <div className="text-center mb-6">
+              <p className="text-xs text-[var(--text-muted)] uppercase tracking-wider mb-2">
+                Predicted Outcome
               </p>
-              <div className="mt-2 bg-green-200 rounded-full h-1.5">
-                <div
-                  className="bg-green-600 h-1.5 rounded-full transition-all duration-500"
-                  style={{ width: `${pred.probabilities.home_or_draw * 100}%` }}
-                />
-              </div>
+              <p className={`text-2xl md:text-3xl font-bold ${
+                mainPrediction.prediction.includes('Away')
+                  ? 'text-[var(--accent-magenta)]'
+                  : 'text-[var(--accent-cyan)]'
+              }`}>
+                {mainPrediction.prediction}
+              </p>
             </div>
 
-            <div className="bg-gradient-to-br from-orange-50 to-orange-100 p-4 rounded-lg">
-              <p className="text-xs text-gray-600 mb-1">Away Win</p>
-              <p className="text-2xl font-bold text-orange-700">
-                {(pred.probabilities.away * 100).toFixed(1)}%
-              </p>
-              <div className="mt-2 bg-orange-200 rounded-full h-1.5">
-                <div
-                  className="bg-orange-600 h-1.5 rounded-full transition-all duration-500"
-                  style={{ width: `${pred.probabilities.away * 100}%` }}
-                />
-              </div>
+            {/* Radial Charts */}
+            <div className="flex justify-center gap-8 md:gap-16 mb-8">
+              <RadialChart
+                percent={mainPrediction.probabilities.home_or_draw * 100}
+                color="var(--accent-cyan)"
+                label="Home/Draw"
+                size={110}
+                strokeWidth={8}
+              />
+              <RadialChart
+                percent={mainPrediction.confidence * 100}
+                color="var(--accent-purple)"
+                label="Confidence"
+                size={110}
+                strokeWidth={8}
+              />
+              <RadialChart
+                percent={mainPrediction.probabilities.away * 100}
+                color="var(--accent-magenta)"
+                label="Away Win"
+                size={110}
+                strokeWidth={8}
+              />
             </div>
           </div>
-        </div>
-      ))}
+        )}
 
-      <p className="text-xs text-center text-gray-500">
-        Prediction updates automatically every 5 minutes
-      </p>
+        {/* Model Comparison */}
+        <div>
+          <h4 className="font-mono text-xs text-[var(--text-muted)] uppercase tracking-wider mb-4">
+            Model Comparison
+          </h4>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            {modelOrder.map((model) => {
+              const pred = predictions[model];
+              if (!pred) return null;
+              return (
+                <ModelBar
+                  key={model}
+                  model={model}
+                  homeDrawProb={pred.probabilities.home_or_draw}
+                  awayProb={pred.probabilities.away}
+                  isActive={false}
+                />
+              );
+            })}
+          </div>
+        </div>
+
+      </div>
     </div>
   );
 }
