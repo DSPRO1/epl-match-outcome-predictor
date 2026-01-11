@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 interface MatchInput {
   home_team: string;
   away_team: string;
+  model?: string;
   home_elo?: number;
   away_elo?: number;
   home_gf_roll?: number;
@@ -25,6 +26,7 @@ interface PredictionResult {
   };
   confidence: number;
   features_used: Record<string, number>;
+  model_used: string;
 }
 
 interface Team {
@@ -48,6 +50,7 @@ export default function PredictionForm() {
   const [formData, setFormData] = useState<MatchInput>({
     home_team: '',
     away_team: '',
+    model: 'random_forest',
   });
 
   // Fetch teams on component mount
@@ -129,45 +132,62 @@ export default function PredictionForm() {
 
           {/* Team Selection */}
           {!loadingTeams && (
-            <div className="grid grid-cols-2 gap-4">
+            <>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Home Team
+                  Model Selection
                 </label>
                 <select
-                  required
-                  value={formData.home_team}
-                  onChange={(e) => handleInputChange('home_team', e.target.value)}
+                  value={formData.model}
+                  onChange={(e) => handleInputChange('model', e.target.value)}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
                 >
-                  <option value="">Select home team...</option>
-                  {teams.map(team => (
-                    <option key={team.team_name} value={team.team_name}>
-                      {team.team_name} (ELO: {Math.round(team.elo_rating)})
-                    </option>
-                  ))}
+                  <option value="random_forest">Random Forest</option>
+                  <option value="xgboost">XGBoost</option>
+                  <option value="lightgbm">LightGBM</option>
                 </select>
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Away Team
-                </label>
-                <select
-                  required
-                  value={formData.away_team}
-                  onChange={(e) => handleInputChange('away_team', e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
-                >
-                  <option value="">Select away team...</option>
-                  {teams.map(team => (
-                    <option key={team.team_name} value={team.team_name}>
-                      {team.team_name} (ELO: {Math.round(team.elo_rating)})
-                    </option>
-                  ))}
-                </select>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Home Team
+                  </label>
+                  <select
+                    required
+                    value={formData.home_team}
+                    onChange={(e) => handleInputChange('home_team', e.target.value)}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
+                  >
+                    <option value="">Select home team...</option>
+                    {teams.map(team => (
+                      <option key={team.team_name} value={team.team_name}>
+                        {team.team_name} (ELO: {Math.round(team.elo_rating)})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Away Team
+                  </label>
+                  <select
+                    required
+                    value={formData.away_team}
+                    onChange={(e) => handleInputChange('away_team', e.target.value)}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
+                  >
+                    <option value="">Select away team...</option>
+                    {teams.map(team => (
+                      <option key={team.team_name} value={team.team_name}>
+                        {team.team_name} (ELO: {Math.round(team.elo_rating)})
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
-            </div>
+            </>
           )}
 
           {/* Advanced Options Toggle */}
@@ -296,7 +316,12 @@ export default function PredictionForm() {
       {/* Results Display */}
       {result && (
         <div className="mt-6 bg-white rounded-2xl shadow-xl p-8 space-y-6">
-          <h2 className="text-2xl font-bold text-gray-800">Prediction Results</h2>
+          <div className="flex items-center justify-between">
+            <h2 className="text-2xl font-bold text-gray-800">Prediction Results</h2>
+            <span className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-medium">
+              {result.model_used.replace('_', ' ').toUpperCase()}
+            </span>
+          </div>
 
           <div className="text-center py-6">
             <h3 className="text-4xl font-bold text-gray-900 mb-2">

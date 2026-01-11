@@ -18,66 +18,82 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 import pickle
 import modal
 from src.config import (
-    RANDOM_FOREST_MODEL, XGBOOST_MODEL, LIGHTGBM_MODEL,
-    FEATURES_FILE, MODAL_APP_NAME
+    RANDOM_FOREST_MODEL,
+    XGBOOST_MODEL,
+    LIGHTGBM_MODEL,
+    FEATURES_FILE,
+    MODAL_APP_NAME,
 )
 
 
 def main():
-    parser = argparse.ArgumentParser(description='Deploy model to Modal')
+    parser = argparse.ArgumentParser(description="Deploy model to Modal")
     parser.add_argument(
-        '--model',
-        choices=['random_forest', 'xgboost', 'lightgbm'],
-        default='random_forest',
-        help='Which model to deploy (default: random_forest)'
+        "--model",
+        choices=["random_forest", "xgboost", "lightgbm", "all"],
+        default="all",
+        help="Which model to deploy (default: all)",
     )
     args = parser.parse_args()
 
     # Map model names to files
     model_files = {
-        'random_forest': RANDOM_FOREST_MODEL,
-        'xgboost': XGBOOST_MODEL,
-        'lightgbm': LIGHTGBM_MODEL
+        "random_forest": RANDOM_FOREST_MODEL,
+        "xgboost": XGBOOST_MODEL,
+        "lightgbm": LIGHTGBM_MODEL,
     }
 
-    model_path = model_files[args.model]
+    # Determine which models to deploy
+    if args.model == "all":
+        models_to_deploy = ["random_forest", "xgboost", "lightgbm"]
+    else:
+        models_to_deploy = [args.model]
 
     print("=" * 60)
-    print(f"Deploying {args.model} to Modal")
+    print(f"Deploying {', '.join(models_to_deploy)} to Modal")
     print("=" * 60)
 
-    # Check if model exists
-    if not model_path.exists():
-        print(f"\n✗ Model not found: {model_path}")
-        print(f"  Run 'python scripts/train_models.py --model {args.model}' first")
-        sys.exit(1)
-
+    # Check if features file exists
     if not FEATURES_FILE.exists():
         print(f"\n✗ Features file not found: {FEATURES_FILE}")
         print("  Run 'python scripts/train_models.py' first")
         sys.exit(1)
 
-    # Load model and features
-    print("\nLoading model and features...")
-    with open(model_path, 'rb') as f:
-        model_bytes = f.read()
-
-    with open(FEATURES_FILE, 'rb') as f:
+    # Load features (shared across all models)
+    print("\nLoading features...")
+    with open(FEATURES_FILE, "rb") as f:
         features_bytes = f.read()
 
-    # Upload to Modal
-    print("Uploading to Modal...")
+    # Upload each model
     app = modal.App(MODAL_APP_NAME)
-
-    # Get the upload_model function from modal_api
     upload_fn = modal.Function.lookup(MODAL_APP_NAME, "upload_model")
 
-    result = upload_fn.remote(model_bytes, features_bytes)
+    for model_name in models_to_deploy:
+        model_path = model_files[model_name]
 
-    print("\n✓ Deployment successful!")
-    print(f"\nModel: {result['model_type']}")
-    print(f"Features: {len(result['features'])} features")
-    print(f"Path: {result['model_path']}")
+        print(f"\n{'-' * 60}")
+        print(f"Processing {model_name}...")
+        print(f"{'-' * 60}")
+
+        # Check if model exists
+        if not model_path.exists():
+            print(f"\n✗ Model not found: {model_path}")
+            print(f"  Run 'python scripts/train_models.py --model {model_name}' first")
+            continue
+
+        # Load model
+        print(f"Loading model from {model_path}...")
+        with open(model_path, "rb") as f:
+            model_bytes = f.read()
+
+        # Upload to Modal
+        print("Uploading to Modal...")
+        result = upload_fn.remote(model_bytes, features_bytes, model_name)
+
+        print(f"\n✓ {model_name} deployment successful!")
+        print(f"  Model: {result['model_type']}")
+        print(f"  Features: {len(result['features'])} features")
+        print(f"  Path: {result['model_path']}")
 
     print("\n" + "=" * 60)
     print("Deployment complete!")

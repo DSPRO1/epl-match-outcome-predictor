@@ -34,7 +34,11 @@ image = modal.Image.debian_slim(python_version="3.11").pip_install(
 
 # Create Modal volume for model storage
 volume = modal.Volume.from_name("epl-models", create_if_missing=True)
-MODEL_PATH = "/models/random_forest_model.pkl"
+MODEL_PATHS = {
+    "random_forest": "/models/random_forest_model.pkl",
+    "xgboost": "/models/xgboost_model.pkl",
+    "lightgbm": "/models/lightgbm_model.pkl",
+}
 FEATURES_PATH = "/models/features.pkl"
 
 
@@ -47,6 +51,10 @@ class MatchInput(BaseModel):
 
     home_team: str = Field(..., description="Home team name")
     away_team: str = Field(..., description="Away team name")
+    model: Optional[str] = Field(
+        "random_forest",
+        description="Model to use for prediction: random_forest, xgboost, or lightgbm",
+    )
     home_elo: Optional[float] = Field(
         None, description="Home team ELO rating (optional override)"
     )
@@ -88,6 +96,7 @@ class PredictionOutput(BaseModel):
     probabilities: dict
     confidence: float
     features_used: dict
+    model_used: str
 
 
 class TeamStats(BaseModel):
@@ -332,20 +341,24 @@ def get_next_fixture() -> Optional[dict]:
     volumes={"/models": volume},
     timeout=60,
 )
-def upload_model(model_bytes: bytes, features_bytes: bytes):
+def upload_model(
+    model_bytes: bytes, features_bytes: bytes, model_name: str = "random_forest"
+):
     """
     Upload a pre-trained model to Modal volume.
 
     Args:
         model_bytes: Pickled model bytes
         features_bytes: Pickled features list bytes
+        model_name: Name of the model being uploaded
     """
     import pickle
 
-    print("Uploading model to Modal volume...")
+    print(f"Uploading {model_name} model to Modal volume...")
 
     # Save model and features
-    with open(MODEL_PATH, "wb") as f:
+    model_path = MODEL_PATHS[model_name]
+    with open(model_path, "wb") as f:
         f.write(model_bytes)
 
     with open(FEATURES_PATH, "wb") as f:
@@ -356,7 +369,7 @@ def upload_model(model_bytes: bytes, features_bytes: bytes):
     print("✓ Model uploaded successfully!")
 
     # Verify model can be loaded
-    with open(MODEL_PATH, "rb") as f:
+    with open(model_path, "rb") as f:
         model = pickle.load(f)
 
     with open(FEATURES_PATH, "rb") as f:
@@ -364,9 +377,10 @@ def upload_model(model_bytes: bytes, features_bytes: bytes):
 
     return {
         "status": "success",
-        "model_path": MODEL_PATH,
+        "model_path": model_path,
         "features": features,
         "model_type": str(type(model).__name__),
+        "model_name": model_name,
     }
 
 
@@ -437,8 +451,8 @@ async def health():
     """Health check endpoint."""
     import os
 
-    model_exists = os.path.exists(MODEL_PATH)
-    return {"status": "healthy", "model_loaded": model_exists}
+    models_status = {model: os.path.exists(path) for model, path in MODEL_PATHS.items()}
+    return {"status": "healthy", "models_loaded": models_status}
 
 
 @web_app.post("/predict", response_model=PredictionOutput)
@@ -456,14 +470,23 @@ async def predict(match: MatchInput, api_key: str = Security(verify_api_key)):
 
     import numpy as np
 
-    # Check if model exists
-    if not os.path.exists(MODEL_PATH):
+    # Validate model selection
+    if match.model not in MODEL_PATHS:
         raise HTTPException(
-            status_code=503, detail="Model not initialized. Please run training first."
+            status_code=400,
+            detail=f"Invalid model '{match.model}'. Choose from: {list(MODEL_PATHS.keys())}",
+        )
+
+    # Check if model exists
+    model_path = MODEL_PATHS[match.model]
+    if not os.path.exists(model_path):
+        raise HTTPException(
+            status_code=503,
+            detail=f"Model '{match.model}' not initialized. Please run training first.",
         )
 
     # Load model
-    with open(MODEL_PATH, "rb") as f:
+    with open(model_path, "rb") as f:
         model = pickle.load(f)
 
     with open(FEATURES_PATH, "rb") as f:
@@ -598,6 +621,7 @@ async def predict(match: MatchInput, api_key: str = Security(verify_api_key)):
         probabilities=probabilities,
         confidence=confidence,
         features_used=features_used,
+        model_used=match.model,
     )
 
 

@@ -20,11 +20,12 @@ interface PredictionResult {
   };
   confidence: number;
   features_used: Record<string, number>;
+  model_used: string;
 }
 
 interface CachedData {
   fixture: Fixture;
-  prediction: PredictionResult;
+  predictions: Record<string, PredictionResult>;
   timestamp: number;
 }
 
@@ -35,7 +36,7 @@ export default function NextMatchPrediction() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [fixture, setFixture] = useState<Fixture | null>(null);
-  const [prediction, setPrediction] = useState<PredictionResult | null>(null);
+  const [predictions, setPredictions] = useState<Record<string, PredictionResult>>({});
 
   useEffect(() => {
     loadNextMatchPrediction();
@@ -47,7 +48,7 @@ export default function NextMatchPrediction() {
       const cached = checkCache();
       if (cached) {
         setFixture(cached.fixture);
-        setPrediction(cached.prediction);
+        setPredictions(cached.predictions);
         setLoading(false);
         return;
       }
@@ -69,33 +70,39 @@ export default function NextMatchPrediction() {
       const fixtureData: Fixture = await fixtureResponse.json();
       setFixture(fixtureData);
 
-      // Make prediction
+      // Make predictions from all three models
       const apiKey = import.meta.env.PUBLIC_API_KEY;
       if (!apiKey) {
         throw new Error('API key not configured');
       }
 
-      const predictionResponse = await fetch(`${apiUrl}/predict`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-API-Key': apiKey,
-        },
-        body: JSON.stringify({
-          home_team: fixtureData.home_team,
-          away_team: fixtureData.away_team,
-        }),
-      });
+      const models = ['random_forest', 'xgboost', 'lightgbm'];
+      const predictionsData: Record<string, PredictionResult> = {};
 
-      if (!predictionResponse.ok) {
-        throw new Error('Failed to get prediction');
+      for (const model of models) {
+        const predictionResponse = await fetch(`${apiUrl}/predict`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-API-Key': apiKey,
+          },
+          body: JSON.stringify({
+            home_team: fixtureData.home_team,
+            away_team: fixtureData.away_team,
+            model: model,
+          }),
+        });
+
+        if (predictionResponse.ok) {
+          const predictionData: PredictionResult = await predictionResponse.json();
+          predictionsData[model] = predictionData;
+        }
       }
 
-      const predictionData: PredictionResult = await predictionResponse.json();
-      setPrediction(predictionData);
+      setPredictions(predictionsData);
 
       // Cache the results
-      cacheResults(fixtureData, predictionData);
+      cacheResults(fixtureData, predictionsData);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load prediction');
       console.error('Error loading next match prediction:', err);
@@ -125,11 +132,11 @@ export default function NextMatchPrediction() {
     }
   };
 
-  const cacheResults = (fixtureData: Fixture, predictionData: PredictionResult) => {
+  const cacheResults = (fixtureData: Fixture, predictionsData: Record<string, PredictionResult>) => {
     try {
       const data: CachedData = {
         fixture: fixtureData,
-        prediction: predictionData,
+        predictions: predictionsData,
         timestamp: Date.now(),
       };
       sessionStorage.setItem(CACHE_KEY, JSON.stringify(data));
@@ -137,6 +144,8 @@ export default function NextMatchPrediction() {
       console.warn('Failed to cache results:', err);
     }
   };
+
+
 
   const formatKickoffTime = (kickoff: string) => {
     try {
@@ -165,7 +174,7 @@ export default function NextMatchPrediction() {
     );
   }
 
-  if (error || !fixture || !prediction) {
+  if (error || !fixture || Object.keys(predictions).length === 0) {
     return null; // Don't show anything if there's an error or no data
   }
 
@@ -197,46 +206,53 @@ export default function NextMatchPrediction() {
         )}
       </div>
 
-      <div className="bg-white rounded-xl p-6 mb-4">
-        <div className="text-center mb-4">
-          <p className="text-2xl font-bold text-indigo-600 mb-2">
-            {prediction.prediction}
-          </p>
-          <p className="text-lg text-gray-600">
-            Confidence: <span className="font-bold text-purple-600">
-              {(prediction.confidence * 100).toFixed(1)}%
+      {Object.entries(predictions).map(([model, pred]) => (
+        <div key={model} className="bg-white rounded-xl p-6 mb-4">
+          <div className="flex items-center justify-between mb-4">
+            <div className="text-center flex-1">
+              <p className="text-2xl font-bold text-indigo-600 mb-2">
+                {pred.prediction}
+              </p>
+              <p className="text-lg text-gray-600">
+                Confidence: <span className="font-bold text-purple-600">
+                  {(pred.confidence * 100).toFixed(1)}%
+                </span>
+              </p>
+            </div>
+            <span className="px-3 py-1 bg-indigo-100 text-indigo-800 rounded-full text-sm font-medium">
+              {pred.model_used.replace('_', ' ').toUpperCase()}
             </span>
-          </p>
-        </div>
-
-        <div className="grid grid-cols-2 gap-4">
-          <div className="bg-gradient-to-br from-green-50 to-green-100 p-4 rounded-lg">
-            <p className="text-xs text-gray-600 mb-1">Home/Draw</p>
-            <p className="text-2xl font-bold text-green-700">
-              {(prediction.probabilities.home_or_draw * 100).toFixed(1)}%
-            </p>
-            <div className="mt-2 bg-green-200 rounded-full h-1.5">
-              <div
-                className="bg-green-600 h-1.5 rounded-full transition-all duration-500"
-                style={{ width: `${prediction.probabilities.home_or_draw * 100}%` }}
-              />
-            </div>
           </div>
 
-          <div className="bg-gradient-to-br from-orange-50 to-orange-100 p-4 rounded-lg">
-            <p className="text-xs text-gray-600 mb-1">Away Win</p>
-            <p className="text-2xl font-bold text-orange-700">
-              {(prediction.probabilities.away * 100).toFixed(1)}%
-            </p>
-            <div className="mt-2 bg-orange-200 rounded-full h-1.5">
-              <div
-                className="bg-orange-600 h-1.5 rounded-full transition-all duration-500"
-                style={{ width: `${prediction.probabilities.away * 100}%` }}
-              />
+          <div className="grid grid-cols-2 gap-4">
+            <div className="bg-gradient-to-br from-green-50 to-green-100 p-4 rounded-lg">
+              <p className="text-xs text-gray-600 mb-1">Home/Draw</p>
+              <p className="text-2xl font-bold text-green-700">
+                {(pred.probabilities.home_or_draw * 100).toFixed(1)}%
+              </p>
+              <div className="mt-2 bg-green-200 rounded-full h-1.5">
+                <div
+                  className="bg-green-600 h-1.5 rounded-full transition-all duration-500"
+                  style={{ width: `${pred.probabilities.home_or_draw * 100}%` }}
+                />
+              </div>
+            </div>
+
+            <div className="bg-gradient-to-br from-orange-50 to-orange-100 p-4 rounded-lg">
+              <p className="text-xs text-gray-600 mb-1">Away Win</p>
+              <p className="text-2xl font-bold text-orange-700">
+                {(pred.probabilities.away * 100).toFixed(1)}%
+              </p>
+              <div className="mt-2 bg-orange-200 rounded-full h-1.5">
+                <div
+                  className="bg-orange-600 h-1.5 rounded-full transition-all duration-500"
+                  style={{ width: `${pred.probabilities.away * 100}%` }}
+                />
+              </div>
             </div>
           </div>
         </div>
-      </div>
+      ))}
 
       <p className="text-xs text-center text-gray-500">
         Prediction updates automatically every 5 minutes
