@@ -4,9 +4,10 @@ Database operations module.
 Handles PostgreSQL database connections and team statistics updates.
 """
 
+import json
 import pandas as pd
 import psycopg2
-from psycopg2.extras import execute_values
+from psycopg2.extras import execute_values, Json
 from datetime import datetime
 from collections import defaultdict
 from typing import List, Dict
@@ -314,18 +315,34 @@ def save_prediction(prediction: Dict):
                 away_prob FLOAT NOT NULL,
                 confidence FLOAT NOT NULL,
                 features JSONB,
+                model_used VARCHAR(50),
+                match_date DATE,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """
         cur.execute(create_table_query)
 
+        # Add new columns if they don't exist (for existing tables)
+        cur.execute("""
+            DO $$
+            BEGIN
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='predictions' AND column_name='model_used') THEN
+                    ALTER TABLE predictions ADD COLUMN model_used VARCHAR(50);
+                END IF;
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='predictions' AND column_name='match_date') THEN
+                    ALTER TABLE predictions ADD COLUMN match_date DATE;
+                END IF;
+            END $$;
+        """)
+
         insert_query = """
             INSERT INTO predictions (
                 home_team, away_team, prediction, home_or_draw_prob,
-                away_prob, confidence, features
-            ) VALUES (%s, %s, %s, %s, %s, %s, %s)
+                away_prob, confidence, features, model_used, match_date
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
         """
 
+        features = prediction.get("features_used")
         cur.execute(
             insert_query,
             (
@@ -335,7 +352,9 @@ def save_prediction(prediction: Dict):
                 prediction["home_or_draw_prob"],
                 prediction["away_prob"],
                 prediction["confidence"],
-                prediction.get("features_used"),
+                Json(features) if features else None,
+                prediction.get("model_used"),
+                prediction.get("match_date"),
             ),
         )
 
@@ -343,5 +362,117 @@ def save_prediction(prediction: Dict):
     except Exception as e:
         conn.rollback()
         raise
+    finally:
+        conn.close()
+
+
+def get_predictions_with_results(limit: int = 50) -> List[Dict]:
+    """
+    Get historical predictions with actual match results.
+
+    Args:
+        limit: Maximum number of predictions to return
+
+    Returns:
+        List of predictions with actual results where available
+    """
+    conn = get_connection()
+    try:
+        cur = conn.cursor()
+
+        # First, get predictions
+        predictions_query = """
+            SELECT
+                id,
+                home_team,
+                away_team,
+                prediction,
+                home_or_draw_prob,
+                away_prob,
+                confidence,
+                model_used,
+                match_date,
+                created_at
+            FROM predictions
+            ORDER BY created_at DESC
+            LIMIT %s
+        """
+
+        cur.execute(predictions_query, (limit,))
+        prediction_rows = cur.fetchall()
+
+        # Build list of match lookups
+        predictions = []
+        match_lookups = []
+
+        for row in prediction_rows:
+            pred = {
+                "id": row[0],
+                "home_team": row[1],
+                "away_team": row[2],
+                "prediction": row[3],
+                "home_or_draw_prob": float(row[4]) if row[4] else None,
+                "away_prob": float(row[5]) if row[5] else None,
+                "confidence": float(row[6]) if row[6] else None,
+                "model_used": row[7],
+                "match_date": str(row[8]) if row[8] else None,
+                "created_at": row[9].isoformat() if row[9] else None,
+                "actual_home_score": None,
+                "actual_away_score": None,
+                "actual_result": None,
+                "was_correct": None,
+            }
+            predictions.append(pred)
+            match_lookups.append((row[1], row[2], row[9]))  # home, away, created_at
+
+        # Try to look up actual results from matches table
+        try:
+            for i, (home_team, away_team, created_at) in enumerate(match_lookups):
+                if not created_at:
+                    continue
+
+                # Find matching result
+                match_query = """
+                    SELECT home_score, away_score
+                    FROM matches
+                    WHERE home_team = %s AND away_team = %s
+                    AND kickoff_datetime >= %s
+                    AND home_score IS NOT NULL AND away_score IS NOT NULL
+                    ORDER BY kickoff_datetime ASC
+                    LIMIT 1
+                """
+                cur.execute(match_query, (home_team, away_team, created_at))
+                match_result = cur.fetchone()
+
+                if match_result:
+                    home_score, away_score = match_result
+
+                    # Determine actual result
+                    if home_score > away_score:
+                        actual_result = "Home Win"
+                    elif home_score < away_score:
+                        actual_result = "Away Win"
+                    else:
+                        actual_result = "Draw"
+
+                    # Check if prediction was correct
+                    predicted_outcome = predictions[i]["prediction"]
+                    if predicted_outcome == "Home Win or Draw":
+                        was_correct = actual_result in ["Home Win", "Draw"]
+                    elif predicted_outcome == "Away Win":
+                        was_correct = actual_result == "Away Win"
+                    else:
+                        was_correct = None
+
+                    predictions[i]["actual_home_score"] = home_score
+                    predictions[i]["actual_away_score"] = away_score
+                    predictions[i]["actual_result"] = actual_result
+                    predictions[i]["was_correct"] = was_correct
+
+        except Exception as e:
+            # If matches table doesn't exist or query fails, just return predictions without results
+            print(f"Could not fetch match results: {e}")
+
+        return predictions
     finally:
         conn.close()

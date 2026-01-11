@@ -22,7 +22,7 @@ export default function IntroStory({ onComplete }: { onComplete: () => void }) {
             High randomness, dynamic team performance, and the infamous <span className="text-[var(--accent-cyan)]">"draw problem"</span> make
             accurate predictions extremely difficult.
           </p>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-8">
             <div className="p-4 bg-[var(--bg-elevated)] rounded-xl border border-[var(--border-subtle)]">
               <p className="font-mono text-3xl font-bold text-[var(--accent-magenta)]">54.6%</p>
               <p className="text-sm text-[var(--text-muted)] mt-1">Initial 3-class accuracy</p>
@@ -30,10 +30,6 @@ export default function IntroStory({ onComplete }: { onComplete: () => void }) {
             <div className="p-4 bg-[var(--bg-elevated)] rounded-xl border border-[var(--border-subtle)]">
               <p className="font-mono text-3xl font-bold text-[var(--accent-orange)]">~25%</p>
               <p className="text-sm text-[var(--text-muted)] mt-1">Matches end in draws</p>
-            </div>
-            <div className="p-4 bg-[var(--bg-elevated)] rounded-xl border border-[var(--border-subtle)]">
-              <p className="font-mono text-3xl font-bold text-[var(--text-muted)]">3/221</p>
-              <p className="text-sm text-[var(--text-muted)] mt-1">Draws correctly predicted</p>
             </div>
           </div>
           <p className="text-sm text-[var(--text-muted)] italic">

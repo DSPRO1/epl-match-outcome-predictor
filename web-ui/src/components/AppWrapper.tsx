@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import IntroStory from './IntroStory';
 import NextMatchPrediction from './NextMatchPrediction';
 import PredictionForm from './PredictionForm';
+import PredictionHistory from './PredictionHistory';
 
 const INTRO_SEEN_KEY = 'epl_intro_seen';
 
@@ -137,6 +138,28 @@ export default function AppWrapper() {
           </p>
         </div>
         <PredictionForm />
+      </section>
+
+      {/* Divider */}
+      <div className="max-w-4xl mx-auto mb-12">
+        <div className="flex items-center gap-4">
+          <div className="flex-1 h-px bg-gradient-to-r from-transparent via-[var(--border-subtle)] to-transparent"></div>
+          <span className="font-mono text-xs text-[var(--text-muted)] uppercase tracking-widest">Track Record</span>
+          <div className="flex-1 h-px bg-gradient-to-r from-transparent via-[var(--border-subtle)] to-transparent"></div>
+        </div>
+      </div>
+
+      {/* Prediction History Section */}
+      <section className="max-w-5xl mx-auto mb-16 opacity-0 animate-fade-in-up delay-500" style={{ animationFillMode: 'forwards' }}>
+        <div className="text-center mb-8">
+          <h2 className="text-2xl md:text-3xl font-bold text-[var(--text-primary)] mb-2">
+            Predictions vs Reality
+          </h2>
+          <p className="text-[var(--text-secondary)]">
+            See how our models performed against actual match results
+          </p>
+        </div>
+        <PredictionHistory />
       </section>
 
       {/* Footer */}

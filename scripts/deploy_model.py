@@ -65,8 +65,7 @@ def main():
         features_bytes = f.read()
 
     # Upload each model
-    app = modal.App(MODAL_APP_NAME)
-    upload_fn = modal.Function.lookup(MODAL_APP_NAME, "upload_model")
+    upload_fn = modal.Function.from_name(MODAL_APP_NAME, "upload_model")
 
     for model_name in models_to_deploy:
         model_path = model_files[model_name]

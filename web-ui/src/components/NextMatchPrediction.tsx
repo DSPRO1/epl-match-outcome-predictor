@@ -30,7 +30,7 @@ interface CachedData {
 }
 
 const CACHE_KEY = 'epl_next_match_prediction';
-const CACHE_DURATION = 5 * 60 * 1000;
+const CACHE_DURATION = 30 * 60 * 1000; // 30 minutes
 
 // Radial progress chart component
 function RadialChart({
@@ -214,25 +214,39 @@ export default function NextMatchPrediction() {
       }
 
       const models = ['random_forest', 'xgboost', 'lightgbm'];
+
+      // Fetch all models in parallel for faster loading
+      const predictionPromises = models.map(async (model) => {
+        try {
+          const response = await fetch(`${apiUrl}/predict`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-API-Key': apiKey,
+            },
+            body: JSON.stringify({
+              home_team: fixtureData.home_team,
+              away_team: fixtureData.away_team,
+              model: model,
+            }),
+          });
+
+          if (response.ok) {
+            const data: PredictionResult = await response.json();
+            return { model, data };
+          }
+          return null;
+        } catch {
+          return null;
+        }
+      });
+
+      const results = await Promise.all(predictionPromises);
       const predictionsData: Record<string, PredictionResult> = {};
 
-      for (const model of models) {
-        const predictionResponse = await fetch(`${apiUrl}/predict`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-API-Key': apiKey,
-          },
-          body: JSON.stringify({
-            home_team: fixtureData.home_team,
-            away_team: fixtureData.away_team,
-            model: model,
-          }),
-        });
-
-        if (predictionResponse.ok) {
-          const predictionData: PredictionResult = await predictionResponse.json();
-          predictionsData[model] = predictionData;
+      for (const result of results) {
+        if (result) {
+          predictionsData[result.model] = result.data;
         }
       }
 
@@ -248,7 +262,7 @@ export default function NextMatchPrediction() {
 
   const checkCache = (): CachedData | null => {
     try {
-      const cached = sessionStorage.getItem(CACHE_KEY);
+      const cached = localStorage.getItem(CACHE_KEY);
       if (!cached) return null;
 
       const data: CachedData = JSON.parse(cached);
@@ -258,7 +272,7 @@ export default function NextMatchPrediction() {
         return data;
       }
 
-      sessionStorage.removeItem(CACHE_KEY);
+      localStorage.removeItem(CACHE_KEY);
       return null;
     } catch {
       return null;
@@ -272,7 +286,7 @@ export default function NextMatchPrediction() {
         predictions: predictionsData,
         timestamp: Date.now(),
       };
-      sessionStorage.setItem(CACHE_KEY, JSON.stringify(data));
+      localStorage.setItem(CACHE_KEY, JSON.stringify(data));
     } catch (err) {
       console.warn('Failed to cache results:', err);
     }
