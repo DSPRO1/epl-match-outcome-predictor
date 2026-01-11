@@ -9,10 +9,14 @@ Professional machine learning pipeline for predicting English Premier League mat
 
 ## 🎯 Overview
 
-This project predicts EPL match outcomes (Home/Draw vs Away) using three machine learning models:
-- **Random Forest** (~80.79% accuracy, 0.41 log loss)
-- **XGBoost** (~80.79% accuracy, 0.44 log loss)
-- **LightGBM** (~80.21% accuracy, 0.64 log loss)
+This project predicts whether an away team will win an EPL match using tree-based ensemble methods. After initial experiments showed poor performance with multiclass classification (54.6% accuracy) due to the stochastic nature of draws, the problem was reformulated as a binary classification task.
+
+**Selected Production Model:** LightGBM - a gradient boosting ensemble (optimal trade-off between accuracy, precision, and recall)
+
+**Model Comparison:**
+- **Random Forest** (69.95% accuracy, 0.5865 log loss, 64.98% precision, 60.45% recall)
+- **XGBoost** (71.26% accuracy, **0.5663 log loss**, 61.52% precision, 32.32% recall)
+- **LightGBM** (71.05% accuracy, 0.5850 log loss, **66.49% precision**, **63.40% recall) ⭐
 
 All experiments are tracked with **Weights & Biases** for easy comparison and reproducibility.
 
@@ -86,19 +90,25 @@ bun run dev
 
 ## 📊 Features
 
-The model uses **12 engineered features**:
+The model uses **14 engineered features** organized into four categories:
 
-**ELO Ratings (3):**
-- Home/Away team ELO (chess-style rating system)
-- ELO difference
+**ELO Ratings (3 features):**
+- Home team ELO (chess-style rating system)
+- Away team ELO (chess-style rating system)
+- ELO difference (relative advantage)
 
-**Rolling Form (6):**
-- Goals for/against (5-match averages)
-- Points (5-match averages)
-
-**Rest Days (3):**
-- Days since last match for each team
+**Rest Days (3 features):**
+- Home team rest days (recovery time)
+- Away team rest days (recovery time)
 - Rest day difference
+
+**Rolling Performance (6 features - 5-match window):**
+- Home team: goals for, goals against, points average
+- Away team: goals for, goals against, points average
+
+**Head-to-Head (2 features):**
+- Historical points average for home team vs opponent
+- Historical points average for away team vs opponent
 
 ## 🏗️ Project Structure
 
@@ -130,26 +140,65 @@ epl-match-outcome-predictor/
 └── README.md               # This file
 ```
 
+```
+epl-match-outcome-predictor/
+├── src/                      # Core modules (shared code)
+│   ├── config.py            # Centralized configuration
+│   ├── elo.py               # ELO rating calculations
+│   ├── features.py          # Feature engineering
+│   ├── models.py            # Model training & evaluation
+│   └── database.py          # Database operations
+├── scripts/                  # Pipeline steps
+│   ├── download_data.py     # Step 1: Data ingestion
+│   ├── train_models.py      # Step 2: Train models
+│   ├── update_database.py   # Step 3: Update team stats DB
+│   └── deploy_model.py      # Step 4: Deploy to Modal
+├── pipeline.py              # Main orchestrator
+├── modal_api.py             # FastAPI inference API (deployed on Modal)
+├── schema.sql               # PostgreSQL schema for team stats
+├── data/                    # Data files (CSV)
+├── models/                  # Trained models (PKL)
+├── notebooks/               # Research notebooks (archived)
+│   ├── colossal_sound.ipynb # Data exploration
+│   ├── predict.ipynb        # Initial model development
+│   └── data_loader.py       # Data fetching (used by notebooks)
+├── web-ui/                  # Astro web interface
+├── test_api.py              # API testing utility
+├── requirements.txt         # Python dependencies
+└── README.md               # This file
+```
+
 ## 📈 Model Performance
 
-| Model | Accuracy | Log Loss | Training Time |
-|-------|----------|----------|---------------|
-| Random Forest | 80.79% | 0.4076 | ~15s |
-| XGBoost | 80.79% | 0.4448 | ~20s |
-| LightGBM | 80.21% | 0.6404 | ~5s |
+| Model | Accuracy | Log Loss | Precision | Recall |
+|-------|----------|----------|-----------|--------|
+| Random Forest | 69.95% | 0.5865 | 64.98% | 60.45% |
+| XGBoost | 71.26% | **0.5663** | 61.52% | 32.32% |
+| LightGBM | **71.05%** | 0.5850 | **66.49%** | **63.40%** ⭐ |
 
-*Metrics from test set (2023-2025 seasons)*
+*Metrics from time-series cross-validation across 11 EPL seasons (2015/16 - 2025/26)*
+
+**Model Selection Rationale:**
+- XGBoost achieves the lowest Log Loss but poor Recall (only 32%), failing to detect majority of away wins
+- LightGBM selected for production as it offers the optimal trade-off between discrimination and calibration
+- Evaluation follows hierarchy: Log Loss → Accuracy → Precision → Recall
 
 ## 🔬 Methodology
 
 ### Data Pipeline
 
-1. **Data Collection**: Scrape match data from Premier League API
-2. **ELO Computation**: Calculate pre-match ELO ratings for all teams
-3. **Feature Engineering**: Create rolling statistics and rest days
-4. **Train/Test Split**: Train on 2014-2022, test on 2023-2025
-5. **Model Training**: Train 3 models with different approaches
-6. **Evaluation**: Track metrics, plots, and predictions in W&B
+1. **Data Collection**: Scrape match data from Premier League API (seasons 2015/16 - 2025/26)
+2. **ELO Computation**: Calculate pre-match ELO ratings for all teams (K=20, home advantage=60)
+3. **Feature Engineering**: Create rolling statistics (5-match window), rest days, and head-to-head records
+4. **Time-Series Cross-Validation**: Each fold uses prior seasons for training, current season for testing
+5. **Model Training**: Train and compare three tree-based ensemble methods (Random Forest, XGBoost, LightGBM)
+6. **Evaluation**: Track metrics, plots, and predictions in Weights & Biases
+
+### Problem Formulation
+
+**Binary Classification:** "Away Team Win" vs "Home/Draw"
+
+Initial multiclass approach (Home/Draw/Away) achieved only 54.6% accuracy due to class imbalance and difficulty predicting draws. The binary formulation significantly improved accuracy to over 70% while providing more reliable probability estimates.
 
 ### ELO Rating System
 
