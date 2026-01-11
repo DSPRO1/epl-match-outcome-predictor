@@ -124,6 +124,65 @@ def get_db_connection():
     return psycopg2.connect(database_url)
 
 
+def get_h2h_stats(home_team: str, away_team: str) -> dict:
+    """Calculate H2H stats from database."""
+    import psycopg2.extras
+
+    conn = get_db_connection()
+    try:
+        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cur.execute(
+            """
+            SELECT home_team, away_team, home_score, away_score, kickoff_datetime
+            FROM matches
+            WHERE (
+                (home_team = %s AND away_team = %s) OR
+                (home_team = %s AND away_team = %s)
+            )
+            AND home_score IS NOT NULL AND away_score IS NOT NULL
+            ORDER BY kickoff_datetime DESC
+            LIMIT 50
+        """,
+            (home_team, away_team, away_team, home_team),
+        )
+
+        try:
+            past_matches = cur.fetchall()
+
+            if not past_matches:
+                return {"h2h_avg_points_home": 1.0, "h2h_avg_points_away": 1.0}
+
+            home_points = []
+            away_points = []
+
+            for match in past_matches:
+                if match["home_score"] > match["away_score"]:
+                    points_home_team = 3
+                    points_away_team = 0
+                elif match["home_score"] < match["away_score"]:
+                    points_home_team = 0
+                    points_away_team = 3
+                else:
+                    points_home_team = 1
+                    points_away_team = 1
+
+                if match["home_team"] == home_team:
+                    home_points.append(points_home_team)
+                    away_points.append(points_away_team)
+                else:
+                    home_points.append(points_away_team)
+                    away_points.append(points_home_team)
+
+            return {
+                "h2h_avg_points_home": sum(home_points) / len(home_points),
+                "h2h_avg_points_away": sum(away_points) / len(away_points),
+            }
+        except psycopg2.errors.UndefinedTable:
+            return {"h2h_avg_points_home": 1.0, "h2h_avg_points_away": 1.0}
+    finally:
+        conn.close()
+
+
 def get_team_stats(team_name: str) -> dict:
     """Fetch team stats from database."""
     from datetime import datetime
@@ -212,15 +271,22 @@ def get_next_fixture() -> Optional[dict]:
                     kickoff = match.get("kickoff")
 
                     # Match hasn't been played if scores are None
-                    if home_team.get("score") is None and away_team.get("score") is None:
+                    if (
+                        home_team.get("score") is None
+                        and away_team.get("score") is None
+                    ):
                         if kickoff:
                             try:
                                 # Parse kickoff time and ensure it's timezone-aware (assume UTC)
                                 if kickoff.endswith("Z"):
-                                    kickoff_dt = datetime.fromisoformat(kickoff.replace("Z", "+00:00"))
+                                    kickoff_dt = datetime.fromisoformat(
+                                        kickoff.replace("Z", "+00:00")
+                                    )
                                 else:
                                     # No timezone info, assume UTC
-                                    kickoff_dt = datetime.fromisoformat(kickoff).replace(tzinfo=timezone.utc)
+                                    kickoff_dt = datetime.fromisoformat(
+                                        kickoff
+                                    ).replace(tzinfo=timezone.utc)
 
                                 # Only include future matches
                                 if kickoff_dt > now:
@@ -406,6 +472,7 @@ async def predict(match: MatchInput, api_key: str = Security(verify_api_key)):
     # Fetch team stats from database (or use provided overrides)
     home_stats = get_team_stats(match.home_team)
     away_stats = get_team_stats(match.away_team)
+    h2h_stats = get_h2h_stats(match.home_team, match.away_team)
 
     # Use provided values if available, otherwise use database values
     home_elo = (
@@ -446,6 +513,8 @@ async def predict(match: MatchInput, api_key: str = Security(verify_api_key)):
         if match.rest_days_away is not None
         else away_stats["rest_days"]
     )
+    h2h_avg_points_home = h2h_stats["h2h_avg_points_home"]
+    h2h_avg_points_away = h2h_stats["h2h_avg_points_away"]
 
     # Prepare features
     goal_diff_pre = home_elo - away_elo
@@ -463,6 +532,8 @@ async def predict(match: MatchInput, api_key: str = Security(verify_api_key)):
                 away_gf_roll,
                 away_ga_roll,
                 away_pts_roll,
+                h2h_avg_points_home,
+                h2h_avg_points_away,
                 rest_days_home,
                 rest_days_away,
                 rest_days_diff,
@@ -492,10 +563,33 @@ async def predict(match: MatchInput, api_key: str = Security(verify_api_key)):
         "away_gf_roll": away_gf_roll,
         "away_ga_roll": away_ga_roll,
         "away_pts_roll": away_pts_roll,
+        "h2h_avg_points_home": h2h_avg_points_home,
+        "h2h_avg_points_away": h2h_avg_points_away,
         "rest_days_home": rest_days_home,
         "rest_days_away": rest_days_away,
         "rest_days_diff": rest_days_diff,
     }
+
+    # Save prediction to database
+    try:
+        import sys
+
+        sys.path.insert(0, "/root")
+        from src.database import save_prediction
+
+        save_prediction(
+            {
+                "home_team": match.home_team,
+                "away_team": match.away_team,
+                "prediction": prediction,
+                "home_or_draw_prob": float(proba[0]),
+                "away_prob": float(proba[1]),
+                "confidence": confidence,
+                "features_used": features_used,
+            }
+        )
+    except Exception as e:
+        print(f"Warning: Failed to save prediction to database: {e}")
 
     return PredictionOutput(
         home_team=match.home_team,

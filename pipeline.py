@@ -28,6 +28,7 @@ Usage:
 """
 
 import argparse
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -52,7 +53,7 @@ def run_step(script_path: str, args: list = None):
     print(f"Running: {' '.join(cmd)}")
     print('='*80)
 
-    result = subprocess.run(cmd)
+    result = subprocess.run(cmd, env=os.environ.copy())
     return result.returncode == 0
 
 

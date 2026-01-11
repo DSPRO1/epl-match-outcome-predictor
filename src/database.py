@@ -36,7 +36,7 @@ def create_schema(conn):
     Args:
         conn: Database connection
     """
-    with open('schema.sql', 'r') as f:
+    with open("schema.sql", "r") as f:
         schema = f.read()
 
     cur = conn.cursor()
@@ -58,24 +58,24 @@ def calculate_team_stats_from_matches(matches_df: pd.DataFrame) -> List[Dict]:
     print(f"Processing {len(matches_df)} matches...")
 
     # Ensure datetime column
-    if 'kickoff_datetime' not in matches_df.columns:
-        matches_df['kickoff_datetime'] = pd.to_datetime(matches_df['kickoff'])
+    if "kickoff_datetime" not in matches_df.columns:
+        matches_df["kickoff_datetime"] = pd.to_datetime(matches_df["kickoff"])
 
     # Sort chronologically
-    matches = matches_df.sort_values('kickoff_datetime').copy()
+    matches = matches_df.sort_values("kickoff_datetime").copy()
 
     # Initialize ELO ratings and match history
-    teams = pd.concat([matches['home_team'], matches['away_team']]).unique()
+    teams = pd.concat([matches["home_team"], matches["away_team"]]).unique()
     elo_ratings = init_elo(teams)
     match_history = defaultdict(list)
 
     # Process all matches to update ELO and history
     for _, row in matches.iterrows():
-        home_team = row['home_team']
-        away_team = row['away_team']
-        home_score = row['home_score']
-        away_score = row['away_score']
-        match_date = row['kickoff_datetime']
+        home_team = row["home_team"]
+        away_team = row["away_team"]
+        home_score = row["home_score"]
+        away_score = row["away_score"]
+        match_date = row["kickoff_datetime"]
 
         # Get current ELO
         home_elo = elo_ratings[home_team]
@@ -97,18 +97,12 @@ def calculate_team_stats_from_matches(matches_df: pd.DataFrame) -> List[Dict]:
             home_pts, away_pts = 1, 1
 
         # Store match details
-        match_history[home_team].append({
-            'date': match_date,
-            'gf': home_score,
-            'ga': away_score,
-            'pts': home_pts
-        })
-        match_history[away_team].append({
-            'date': match_date,
-            'gf': away_score,
-            'ga': home_score,
-            'pts': away_pts
-        })
+        match_history[home_team].append(
+            {"date": match_date, "gf": home_score, "ga": away_score, "pts": home_pts}
+        )
+        match_history[away_team].append(
+            {"date": match_date, "gf": away_score, "ga": home_score, "pts": away_pts}
+        )
 
     # Calculate current stats for each team
     team_stats = []
@@ -121,24 +115,26 @@ def calculate_team_stats_from_matches(matches_df: pd.DataFrame) -> List[Dict]:
         recent_matches = history[-ROLLING_WINDOW:]
 
         # Calculate averages
-        gf_avg = sum(m['gf'] for m in recent_matches) / len(recent_matches)
-        ga_avg = sum(m['ga'] for m in recent_matches) / len(recent_matches)
-        pts_avg = sum(m['pts'] for m in recent_matches) / len(recent_matches)
+        gf_avg = sum(m["gf"] for m in recent_matches) / len(recent_matches)
+        ga_avg = sum(m["ga"] for m in recent_matches) / len(recent_matches)
+        pts_avg = sum(m["pts"] for m in recent_matches) / len(recent_matches)
 
         # Get last match date
-        last_match_date = history[-1]['date']
+        last_match_date = history[-1]["date"]
 
-        team_stats.append({
-            'team_name': team,
-            'elo_rating': round(elo_ratings[team], 2),
-            'goals_for_avg': round(gf_avg, 2),
-            'goals_against_avg': round(ga_avg, 2),
-            'points_avg': round(pts_avg, 2),
-            'last_match_date': last_match_date.date(),
-            'matches_played': len(history),
-            'updated_at': datetime.now(),
-            'season': '2024-25'
-        })
+        team_stats.append(
+            {
+                "team_name": team,
+                "elo_rating": round(elo_ratings[team], 2),
+                "goals_for_avg": round(gf_avg, 2),
+                "goals_against_avg": round(ga_avg, 2),
+                "points_avg": round(pts_avg, 2),
+                "last_match_date": last_match_date.date(),
+                "matches_played": len(history),
+                "updated_at": datetime.now(),
+                "season": "2024-25",
+            }
+        )
 
     print(f"Calculated stats for {len(team_stats)} teams")
     return team_stats
@@ -163,15 +159,15 @@ def update_team_stats(team_stats: List[Dict]):
         # Prepare data for bulk insert
         values = [
             (
-                stat['team_name'],
-                stat['elo_rating'],
-                stat['goals_for_avg'],
-                stat['goals_against_avg'],
-                stat['points_avg'],
-                stat['last_match_date'],
-                stat['matches_played'],
-                stat['updated_at'],
-                stat['season']
+                stat["team_name"],
+                stat["elo_rating"],
+                stat["goals_for_avg"],
+                stat["goals_against_avg"],
+                stat["points_avg"],
+                stat["last_match_date"],
+                stat["matches_played"],
+                stat["updated_at"],
+                stat["season"],
             )
             for stat in team_stats
         ]
@@ -236,10 +232,7 @@ def get_team_stats(team_name: str) -> Dict:
     conn = get_connection()
     try:
         cur = conn.cursor()
-        cur.execute(
-            "SELECT * FROM team_stats WHERE team_name = %s",
-            (team_name,)
-        )
+        cur.execute("SELECT * FROM team_stats WHERE team_name = %s", (team_name,))
         result = cur.fetchone()
 
         if not result:
@@ -253,14 +246,14 @@ def get_team_stats(team_name: str) -> Dict:
             rest_days = 7.0
 
         return {
-            'team_name': result[0],
-            'elo_rating': float(result[1]),
-            'goals_for_avg': float(result[2]),
-            'goals_against_avg': float(result[3]),
-            'points_avg': float(result[4]),
-            'last_match_date': str(result[5]),
-            'matches_played': int(result[6]),
-            'rest_days': float(rest_days)
+            "team_name": result[0],
+            "elo_rating": float(result[1]),
+            "goals_for_avg": float(result[2]),
+            "goals_against_avg": float(result[3]),
+            "points_avg": float(result[4]),
+            "last_match_date": str(result[5]),
+            "matches_played": int(result[6]),
+            "rest_days": float(rest_days),
         }
     finally:
         conn.close()
@@ -284,15 +277,71 @@ def list_all_teams() -> List[Dict]:
         """)
         teams = []
         for row in cur.fetchall():
-            teams.append({
-                'team_name': row[0],
-                'elo_rating': float(row[1]),
-                'goals_for_avg': float(row[2]),
-                'goals_against_avg': float(row[3]),
-                'points_avg': float(row[4]),
-                'last_match_date': str(row[5]),
-                'matches_played': int(row[6])
-            })
+            teams.append(
+                {
+                    "team_name": row[0],
+                    "elo_rating": float(row[1]),
+                    "goals_for_avg": float(row[2]),
+                    "goals_against_avg": float(row[3]),
+                    "points_avg": float(row[4]),
+                    "last_match_date": str(row[5]),
+                    "matches_played": int(row[6]),
+                }
+            )
         return teams
+    finally:
+        conn.close()
+
+
+def save_prediction(prediction: Dict):
+    """
+    Save a prediction to the database.
+
+    Args:
+        prediction: Dictionary containing prediction details
+    """
+    conn = get_connection()
+    try:
+        cur = conn.cursor()
+
+        create_table_query = """
+            CREATE TABLE IF NOT EXISTS predictions (
+                id SERIAL PRIMARY KEY,
+                home_team VARCHAR(255) NOT NULL,
+                away_team VARCHAR(255) NOT NULL,
+                prediction VARCHAR(50) NOT NULL,
+                home_or_draw_prob FLOAT NOT NULL,
+                away_prob FLOAT NOT NULL,
+                confidence FLOAT NOT NULL,
+                features JSONB,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """
+        cur.execute(create_table_query)
+
+        insert_query = """
+            INSERT INTO predictions (
+                home_team, away_team, prediction, home_or_draw_prob,
+                away_prob, confidence, features
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s)
+        """
+
+        cur.execute(
+            insert_query,
+            (
+                prediction["home_team"],
+                prediction["away_team"],
+                prediction["prediction"],
+                prediction["home_or_draw_prob"],
+                prediction["away_prob"],
+                prediction["confidence"],
+                prediction.get("features_used"),
+            ),
+        )
+
+        conn.commit()
+    except Exception as e:
+        conn.rollback()
+        raise
     finally:
         conn.close()
