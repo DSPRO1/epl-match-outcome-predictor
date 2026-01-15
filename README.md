@@ -3,7 +3,6 @@
 Professional machine learning pipeline for predicting English Premier League match outcomes using ELO ratings, rolling statistics, and ensemble models with production-ready API deployment.
 
 [![Python](https://img.shields.io/badge/Python-3.11+-blue.svg)](https://www.python.org/)
-[![W&B](https://img.shields.io/badge/Weights%20&%20Biases-Tracking-orange.svg)](https://wandb.ai/dspro1/epl-predictor)
 [![Modal](https://img.shields.io/badge/Deployed%20on-Modal-purple.svg)](https://modal.com/)
 [![Astro](https://img.shields.io/badge/Web%20UI-Astro-orange.svg)](https://dspro1.zayden.ch)
 
@@ -102,9 +101,9 @@ The model uses **14 engineered features** organized into four categories:
 - Away team rest days (recovery time)
 - Rest day difference
 
-**Rolling Performance (6 features - 5-match window):**
-- Home team: goals for, goals against, points average
-- Away team: goals for, goals against, points average
+**Rolling Average (6 features - 5-match window):**
+- Home team: goals for, goals against, points
+- Away team: goals for, goals against, points
 
 **Head-to-Head (2 features):**
 - Historical points average for home team vs opponent
@@ -189,7 +188,7 @@ epl-match-outcome-predictor/
 
 1. **Data Collection**: Scrape match data from Premier League API (seasons 2015/16 - 2025/26)
 2. **ELO Computation**: Calculate pre-match ELO ratings for all teams (K=20, home advantage=60)
-3. **Feature Engineering**: Create rolling statistics (5-match window), rest days, and head-to-head records
+3. **Feature Engineering**: Create rolling statistics, rest days, and head-to-head records
 4. **Time-Series Cross-Validation**: Each fold uses prior seasons for training, current season for testing
 5. **Model Training**: Train and compare three tree-based ensemble methods (Random Forest, XGBoost, LightGBM)
 6. **Evaluation**: Track metrics, plots, and predictions in Weights & Biases
@@ -204,8 +203,11 @@ Initial multiclass approach (Home/Draw/Away) achieved only 54.6% accuracy due to
 
 - Initial rating: 1500
 - K-factor: 20
-- Home advantage: 60 points
 - Updated after each match based on result
+
+### Rolling Average
+
+- Rolling window 5
 
 ## 🚀 API Deployment
 
@@ -268,20 +270,11 @@ python scripts/deploy_model.py --model random_forest
 modal deploy modal_api.py
 ```
 
-## 📚 Documentation
-
-- **[DEPLOYMENT.md](DEPLOYMENT.md)** - API deployment guide for Modal.com
-- **[WANDB_GUIDE.md](WANDB_GUIDE.md)** - Complete W&B integration guide
-- **[API_AUTH_SETUP.md](API_AUTH_SETUP.md)** - API authentication setup
-- **[notebooks/](notebooks/)** - Research notebooks (archived)
-
 ## 🔗 Data Sources
 
 **Premier League Official API:**
 - Match data: `https://sdp-prem-prod.premier-league-prod.pulselive.com/api/v1/competitions/8/seasons/{SEASON}/matchweeks/{WEEK}/matches`
-- Standings: `https://sdp-prem-prod.premier-league-prod.pulselive.com/api/v5/competitions/8/seasons/{SEASON}/standings`
 
 **Reference:**
-- [EPL Table](https://www.premierleague.com/en/tables?competition=8&season=2025&round=L_1&matchweek=-1&ha=-1)
-- [EA FC25 Dataset](https://www.kaggle.com/datasets/nyagami/ea-sports-fc-25-database-ratings-and-stats) (future work)
+- [EPL Matches](https://www.premierleague.com/en/matches?competition=8&season=2025&matchweek=22&month=01)
 
